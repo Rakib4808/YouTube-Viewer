@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Your Cart — MediOrder{% endblock %}
+{% block content %}
+<h1>Your Cart</h1>
+
+{% if items %}
+<table class="table">
+    <thead>
+        <tr>
+            <th>Medicine</th>
+            <th>Price</th>
+            <th>Quantity</th>
+            <th>Subtotal</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>
+                {{ item.medicine['name'] }}
+                {% if item.medicine['rx_required'] %}<span class="tag tag-rx">Rx</span>{% endif %}
+            </td>
+            <td>${{ '%.2f'|format(item.medicine['price']) }}</td>
+            <td>
+                <form method="post" action="{{ url_for('update_cart', medicine_id=item.medicine['id']) }}" class="inline-form">
+                    <input type="number" name="quantity" value="{{ item.quantity }}" min="0" max="{{ item.medicine['stock'] }}">
+                    <button type="submit" class="btn btn-small">Update</button>
+                </form>
+            </td>
+            <td>${{ '%.2f'|format(item.subtotal) }}</td>
+            <td>
+                <form method="post" action="{{ url_for('remove_from_cart', medicine_id=item.medicine['id']) }}" class="inline-form">
+                    <button type="submit" class="btn btn-small btn-danger">Remove</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="3" class="total-label">Total</td>
+            <td colspan="2" class="total">${{ '%.2f'|format(total) }}</td>
+        </tr>
+    </tfoot>
+</table>
+
+<div class="actions">
+    <a href="{{ url_for('index') }}" class="btn">Continue shopping</a>
+    <a href="{{ url_for('checkout') }}" class="btn btn-primary">Proceed to checkout</a>
+</div>
+{% else %}
+<p class="empty">Your cart is empty. <a href="{{ url_for('index') }}">Browse medicines</a>.</p>
+{% endif %}
+{% endblock %}
