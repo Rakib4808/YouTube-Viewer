@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Create account — MediOrder{% endblock %}
+{% block content %}
+<h1>Create an account</h1>
+<p class="hint">Save your delivery details and keep track of all your orders in one place.</p>
+
+<form method="post" class="auth-form">
+    <label>Full name *
+        <input type="text" name="name" value="{{ form.get('name', '') }}" required autofocus>
+    </label>
+    <label>Email *
+        <input type="email" name="email" value="{{ form.get('email', '') }}" required>
+    </label>
+    <label>Phone number
+        <input type="tel" name="phone" value="{{ form.get('phone', '') }}">
+    </label>
+    <label>Delivery address
+        <textarea name="address" rows="3">{{ form.get('address', '') }}</textarea>
+    </label>
+    <label>Password * <span class="hint-inline">(at least 8 characters)</span>
+        <input type="password" name="password" minlength="8" required>
+    </label>
+    <label>Confirm password *
+        <input type="password" name="confirm_password" minlength="8" required>
+    </label>
+    <button type="submit" class="btn btn-primary btn-large">Create account</button>
+</form>
+
+<p class="hint">Already have an account? <a href="{{ url_for('login') }}">Log in</a>.</p>
+{% endblock %}

@@ -18,8 +18,24 @@ Flask and SQLite (no external database required).
   method (cash/card on delivery)
 - **Order tracking** — every order gets a unique order number (e.g.
   `MO-1A2B3C4D`) the customer can use on the Track Order page
+- **User accounts** — register and log in (passwords stored hashed);
+  checkout is prefilled from the profile, orders placed while logged in are
+  linked to the account, and a My Orders page lists them. Guest checkout
+  still works.
 - **Admin panel** — view all orders and update their status
-  (Pending → Confirmed → Out for Delivery → Delivered / Cancelled)
+  (Pending → Confirmed → Out for Delivery → Delivered / Cancelled).
+  Protected by authentication: only accounts with the admin flag can access
+  it.
+
+## Admin account
+
+On first run a default admin account is created:
+
+- Email: `admin@mediorder.local` (override with the `ADMIN_EMAIL` env var)
+- Password: `admin123` (override with the `ADMIN_PASSWORD` env var)
+
+**Change the default password** by setting `ADMIN_PASSWORD` before the first
+run, or by deleting `mediorder.db` and re-running with the env vars set.
 
 ## Getting started
 
@@ -45,6 +61,9 @@ medicine-ordering-app/
 └── templates/
     ├── base.html        # Shared layout (navbar, flash messages, footer)
     ├── index.html       # Catalog with search and category filter
+    ├── login.html       # Log in
+    ├── register.html    # Create account
+    ├── my_orders.html   # Logged-in customer's order history
     ├── cart.html        # Shopping cart
     ├── checkout.html    # Delivery details + order summary
     ├── order.html       # Order confirmation / details
@@ -55,7 +74,7 @@ medicine-ordering-app/
 ## Notes for production use
 
 This is a demo starting point. Before real-world use you would need, at
-minimum: user accounts and authentication (especially for `/admin`),
-real prescription upload and pharmacist verification, a payment gateway,
-CSRF protection, and a production WSGI server (e.g. gunicorn) instead of
-the Flask dev server.
+minimum: real prescription upload and pharmacist verification, a payment
+gateway, CSRF protection, HTTPS, a strong `SECRET_KEY` and `ADMIN_PASSWORD`,
+and a production WSGI server (e.g. gunicorn) instead of the Flask dev
+server.

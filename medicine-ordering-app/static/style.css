@@ -124,6 +124,15 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primary); b
 .order-summary li { display: flex; justify-content: space-between; gap: 0.5rem; padding: 0.3rem 0; border-bottom: 1px dashed var(--border); font-size: 0.92rem; }
 .summary-total { display: flex; justify-content: space-between; font-weight: 700; margin-top: 0.75rem; }
 
+/* Auth */
+.auth-form { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem; max-width: 480px; margin-top: 1rem; }
+.auth-form label { display: block; margin-bottom: 0.75rem; font-weight: 500; }
+.auth-form input, .auth-form textarea { width: 100%; margin-top: 0.25rem; }
+.hint-inline { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
+.nav-user { color: #e6fffa; font-weight: 500; }
+.btn-nav { background: transparent; border-color: #5eead4; color: #e6fffa; }
+.btn-nav:hover { background: var(--primary-dark); }
+
 /* Misc */
 .actions { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
 .empty { color: var(--muted); padding: 2rem 0; text-align: center; }

@@ -14,6 +14,7 @@ import os
 import sqlite3
 import uuid
 from datetime import datetime
+from functools import wraps
 
 from flask import (
     Flask,
@@ -25,6 +26,7 @@ from flask import (
     session,
     url_for,
 )
+from werkzeug.security import check_password_hash, generate_password_hash
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATABASE = os.path.join(BASE_DIR, "mediorder.db")
@@ -93,8 +95,20 @@ def init_db():
             rx_required INTEGER NOT NULL DEFAULT 0
         );
 
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            phone TEXT,
+            address TEXT,
+            password_hash TEXT NOT NULL,
+            is_admin INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(id),
             order_number TEXT UNIQUE NOT NULL,
             customer_name TEXT NOT NULL,
             phone TEXT NOT NULL,
@@ -116,12 +130,33 @@ def init_db():
         );
         """
     )
+    # Databases created before the accounts feature lack orders.user_id.
+    order_columns = [row[1] for row in db.execute("PRAGMA table_info(orders)")]
+    if "user_id" not in order_columns:
+        db.execute("ALTER TABLE orders ADD COLUMN user_id INTEGER REFERENCES users(id)")
+
     count = db.execute("SELECT COUNT(*) FROM medicines").fetchone()[0]
     if count == 0:
         db.executemany(
             "INSERT INTO medicines (name, generic, category, description, price, stock, rx_required)"
             " VALUES (?, ?, ?, ?, ?, ?, ?)",
             SEED_MEDICINES,
+        )
+
+    admin_exists = db.execute("SELECT 1 FROM users WHERE is_admin = 1").fetchone()
+    if not admin_exists:
+        admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+        db.execute(
+            "INSERT INTO users (name, email, phone, address, password_hash, is_admin, created_at)"
+            " VALUES (?, ?, ?, ?, ?, 1, ?)",
+            (
+                "Administrator",
+                os.environ.get("ADMIN_EMAIL", "admin@mediorder.local"),
+                "",
+                "",
+                generate_password_hash(admin_password),
+                datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            ),
         )
     db.commit()
     db.close()
@@ -156,9 +191,153 @@ def cart_details():
     return items, total
 
 
+# ---------------------------------------------------------------------------
+# Authentication helpers
+# ---------------------------------------------------------------------------
+
+def current_user():
+    user_id = session.get("user_id")
+    if user_id is None:
+        return None
+    return get_db().execute(
+        "SELECT * FROM users WHERE id = ?", (user_id,)
+    ).fetchone()
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if current_user() is None:
+            flash("Please log in to continue.", "error")
+            return redirect(url_for("login", next=request.path))
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
+def admin_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        user = current_user()
+        if user is None:
+            flash("Please log in to continue.", "error")
+            return redirect(url_for("login", next=request.path))
+        if not user["is_admin"]:
+            flash("You do not have permission to access the admin area.", "error")
+            return redirect(url_for("index"))
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
+def safe_next_url(target):
+    """Only allow relative redirect targets to prevent open redirects."""
+    if target and target.startswith("/") and not target.startswith("//"):
+        return target
+    return None
+
+
 @app.context_processor
-def inject_cart_count():
-    return {"cart_count": sum(get_cart().values())}
+def inject_globals():
+    return {"cart_count": sum(get_cart().values()), "user": current_user()}
+
+
+# ---------------------------------------------------------------------------
+# Account routes
+# ---------------------------------------------------------------------------
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if current_user() is not None:
+        return redirect(url_for("index"))
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        phone = request.form.get("phone", "").strip()
+        address = request.form.get("address", "").strip()
+        password = request.form.get("password", "")
+        confirm = request.form.get("confirm_password", "")
+
+        errors = []
+        if not name:
+            errors.append("Name is required.")
+        if not email or "@" not in email:
+            errors.append("A valid email address is required.")
+        if len(password) < 8:
+            errors.append("Password must be at least 8 characters long.")
+        if password != confirm:
+            errors.append("Passwords do not match.")
+
+        db = get_db()
+        if not errors and db.execute(
+            "SELECT 1 FROM users WHERE email = ?", (email,)
+        ).fetchone():
+            errors.append("An account with that email already exists.")
+
+        if errors:
+            for error in errors:
+                flash(error, "error")
+            return render_template("register.html", form=request.form)
+
+        cursor = db.execute(
+            "INSERT INTO users (name, email, phone, address, password_hash, is_admin, created_at)"
+            " VALUES (?, ?, ?, ?, ?, 0, ?)",
+            (
+                name,
+                email,
+                phone,
+                address,
+                generate_password_hash(password),
+                datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            ),
+        )
+        db.commit()
+        session["user_id"] = cursor.lastrowid
+        flash(f"Welcome, {name}! Your account has been created.", "success")
+        return redirect(url_for("index"))
+
+    return render_template("register.html", form={})
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if current_user() is not None:
+        return redirect(url_for("index"))
+
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        user = get_db().execute(
+            "SELECT * FROM users WHERE email = ?", (email,)
+        ).fetchone()
+        if user is None or not check_password_hash(user["password_hash"], password):
+            flash("Invalid email or password.", "error")
+            return render_template("login.html", form=request.form)
+
+        session["user_id"] = user["id"]
+        flash(f"Welcome back, {user['name']}!", "success")
+        next_url = safe_next_url(request.args.get("next"))
+        return redirect(next_url or url_for("index"))
+
+    return render_template("login.html", form={})
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.pop("user_id", None)
+    flash("You have been logged out.", "success")
+    return redirect(url_for("index"))
+
+
+@app.route("/my-orders")
+@login_required
+def my_orders():
+    user = current_user()
+    orders = get_db().execute(
+        "SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC", (user["id"],)
+    ).fetchall()
+    return render_template("my_orders.html", orders=orders)
 
 
 # ---------------------------------------------------------------------------
@@ -315,12 +494,14 @@ def checkout():
                 form=request.form,
             )
 
+        user = current_user()
         order_number = "MO-" + uuid.uuid4().hex[:8].upper()
         cursor = db.execute(
-            "INSERT INTO orders (order_number, customer_name, phone, address, note,"
-            " payment_method, status, total, created_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, 'Pending', ?, ?)",
+            "INSERT INTO orders (user_id, order_number, customer_name, phone, address,"
+            " note, payment_method, status, total, created_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?)",
             (
+                user["id"] if user else None,
                 order_number,
                 name,
                 phone,
@@ -353,8 +534,17 @@ def checkout():
         session["cart"] = {}
         return redirect(url_for("order_confirmation", order_number=order_number))
 
+    # Prefill delivery details from the logged-in user's profile.
+    user = current_user()
+    form = {}
+    if user:
+        form = {
+            "name": user["name"],
+            "phone": user["phone"] or "",
+            "address": user["address"] or "",
+        }
     return render_template(
-        "checkout.html", items=items, total=total, rx_items=rx_items, form={},
+        "checkout.html", items=items, total=total, rx_items=rx_items, form=form,
     )
 
 
@@ -389,10 +579,11 @@ def track_order():
 
 
 # ---------------------------------------------------------------------------
-# Admin routes (simple, unauthenticated demo admin)
+# Admin routes (require an account with is_admin = 1)
 # ---------------------------------------------------------------------------
 
 @app.route("/admin/orders")
+@admin_required
 def admin_orders():
     db = get_db()
     orders = db.execute("SELECT * FROM orders ORDER BY id DESC").fetchall()
@@ -400,6 +591,7 @@ def admin_orders():
 
 
 @app.route("/admin/orders/<int:order_id>/status", methods=["POST"])
+@admin_required
 def admin_update_status(order_id):
     status = request.form.get("status")
     if status not in ORDER_STATUSES:
