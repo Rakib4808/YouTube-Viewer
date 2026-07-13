@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Order {{ order['order_number'] }} — MediOrder{% endblock %}
+{% block content %}
+<h1>Order {{ order['order_number'] }}</h1>
+<p class="order-status">Status: <span class="tag tag-status">{{ order['status'] }}</span></p>
+<p>Placed on {{ order['created_at'] }} (UTC) · Payment: {{ order['payment_method'] }}</p>
+
+<h2>Items</h2>
+<table class="table">
+    <thead>
+        <tr><th>Medicine</th><th>Quantity</th><th>Unit price</th><th>Subtotal</th></tr>
+    </thead>
+    <tbody>
+        {% for item in items %}
+        <tr>
+            <td>{{ item['medicine_name'] }}</td>
+            <td>{{ item['quantity'] }}</td>
+            <td>${{ '%.2f'|format(item['unit_price']) }}</td>
+            <td>${{ '%.2f'|format(item['unit_price'] * item['quantity']) }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+    <tfoot>
+        <tr>
+            <td colspan="3" class="total-label">Total</td>
+            <td class="total">${{ '%.2f'|format(order['total']) }}</td>
+        </tr>
+    </tfoot>
+</table>
+
+<h2>Delivery details</h2>
+<p><strong>{{ order['customer_name'] }}</strong> · {{ order['phone'] }}</p>
+<p>{{ order['address'] }}</p>
+{% if order['note'] %}<p>Note: {{ order['note'] }}</p>{% endif %}
+
+<p class="hint">Save your order number <strong>{{ order['order_number'] }}</strong> to track this order later.</p>
+<div class="actions">
+    <a href="{{ url_for('index') }}" class="btn btn-primary">Back to shop</a>
+</div>
+{% endblock %}

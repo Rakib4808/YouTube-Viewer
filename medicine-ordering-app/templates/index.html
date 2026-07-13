@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Shop Medicines — MediOrder{% endblock %}
+{% block content %}
+<section class="hero">
+    <h1>Order medicines online</h1>
+    <p>Browse our catalog and get medicines delivered to your door.</p>
+</section>
+
+<form class="search-bar" method="get" action="{{ url_for('index') }}">
+    <input type="text" name="q" placeholder="Search by name or generic…" value="{{ query }}">
+    <select name="category">
+        <option value="">All categories</option>
+        {% for cat in categories %}
+            <option value="{{ cat }}" {% if cat == selected_category %}selected{% endif %}>{{ cat }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit" class="btn">Search</button>
+</form>
+
+{% if medicines %}
+<div class="grid">
+    {% for m in medicines %}
+    <div class="card">
+        <div class="card-header">
+            <h3>{{ m['name'] }}</h3>
+            {% if m['rx_required'] %}<span class="tag tag-rx">Rx</span>{% endif %}
+        </div>
+        <p class="generic">{{ m['generic'] }} · {{ m['category'] }}</p>
+        <p class="description">{{ m['description'] }}</p>
+        <div class="card-footer">
+            <span class="price">${{ '%.2f'|format(m['price']) }}</span>
+            {% if m['stock'] > 0 %}
+                <form method="post" action="{{ url_for('add_to_cart', medicine_id=m['id']) }}" class="add-form">
+                    <input type="number" name="quantity" value="1" min="1" max="{{ m['stock'] }}">
+                    <button type="submit" class="btn btn-primary">Add to cart</button>
+                </form>
+            {% else %}
+                <span class="tag tag-out">Out of stock</span>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="empty">No medicines matched your search.</p>
+{% endif %}
+{% endblock %}

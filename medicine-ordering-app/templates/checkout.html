@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Checkout — MediOrder{% endblock %}
+{% block content %}
+<h1>Checkout</h1>
+
+<div class="checkout-layout">
+    <form method="post" action="{{ url_for('checkout') }}" class="checkout-form">
+        <h2>Delivery details</h2>
+        <label>Full name *
+            <input type="text" name="name" value="{{ form.get('name', '') }}" required>
+        </label>
+        <label>Phone number *
+            <input type="tel" name="phone" value="{{ form.get('phone', '') }}" required>
+        </label>
+        <label>Delivery address *
+            <textarea name="address" rows="3" required>{{ form.get('address', '') }}</textarea>
+        </label>
+        <label>Note for pharmacist (optional)
+            <textarea name="note" rows="2">{{ form.get('note', '') }}</textarea>
+        </label>
+        <label>Payment method
+            <select name="payment_method">
+                <option value="Cash on Delivery" {% if form.get('payment_method') == 'Cash on Delivery' %}selected{% endif %}>Cash on Delivery</option>
+                <option value="Card on Delivery" {% if form.get('payment_method') == 'Card on Delivery' %}selected{% endif %}>Card on Delivery</option>
+            </select>
+        </label>
+
+        {% if rx_items %}
+        <div class="rx-notice">
+            <p><strong>Prescription required.</strong> Your cart contains prescription-only items:</p>
+            <ul>
+                {% for item in rx_items %}
+                <li>{{ item.medicine['name'] }}</li>
+                {% endfor %}
+            </ul>
+            <label class="checkbox-label">
+                <input type="checkbox" name="rx_confirmed" value="yes">
+                I confirm I hold a valid prescription and will present it to the delivery agent.
+            </label>
+        </div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary btn-large">Place order</button>
+    </form>
+
+    <aside class="order-summary">
+        <h2>Order summary</h2>
+        <ul>
+            {% for item in items %}
+            <li>
+                <span>{{ item.medicine['name'] }} × {{ item.quantity }}</span>
+                <span>${{ '%.2f'|format(item.subtotal) }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+        <p class="summary-total"><span>Total</span> <span>${{ '%.2f'|format(total) }}</span></p>
+    </aside>
+</div>
+{% endblock %}
